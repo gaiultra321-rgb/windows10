@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN mkdir -p /data /iso /novnc
 
-# noVNC ফিক্স (v1.5.0 ডাউনলোড করে index.html লিংক করা হচ্ছে যেন ব্রাউজারে 404 না আসে)
+# noVNC 404 ফিক্স
 RUN wget https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.zip -O /tmp/novnc.zip && \
     unzip /tmp/novnc.zip -d /tmp && \
     mv /tmp/noVNC-1.5.0/* /novnc && \
@@ -31,10 +31,10 @@ if [ -e /dev/kvm ]; then\n\
   echo "✅ KVM acceleration available"\n\
   KVM_ARG="-enable-kvm"\n\
   CPU_ARG="host"\n\
-  MEMORY="12G"\n\
+  MEMORY="10G"\n\
   SMP_CORES=3\n\
 else\n\
-  echo "⚠️  KVM not available - using optimized emulation mode"\n\
+  echo "⚠️  KVM not available"\n\
   KVM_ARG=""\n\
   CPU_ARG="max"\n\
   MEMORY="4G"\n\
@@ -54,21 +54,10 @@ if [ ! -s "/data/disk.qcow2" ] || [ $(stat -c%s "/data/disk.qcow2") -lt 1048576 
   BOOT_ORDER="-boot order=d,menu=on"\n\
 fi\n\
 echo "⚙️ Starting Windows 10 VM with ${SMP_CORES} CPU cores and ${MEMORY} RAM"\n\
-qemu-system-x86_64 \\\n\
-  $KVM_ARG \\\n\
-  -machine q35,accel=kvm:tcg \\\n\
-  -cpu $CPU_ARG,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time \\\n\
-  -m $MEMORY \\\n\
-  -smp $SMP_CORES \\\n\
-  -vga std \\\n\
-  -usb -device usb-tablet \\\n\
-  $BOOT_ORDER \\\n\
-  -drive file=/data/disk.qcow2,format=qcow2,cache=writeback,aio=threads \\\n\
-  -drive file=/iso/os.iso,media=cdrom \\\n\
-  -netdev user,id=net0,hostfwd=tcp::3389-:3389 \\\n\
-  -device e1000,netdev=net0 \\\n\
-  -display vnc=:0 \\\n\
-  -name "Windows10_VM" &\n\
+\n\
+# এক লাইনে ক্লিন QEMU কমান্ড (কোনো ব্যাকস্ল্যাশ এরর হবে না)\n\
+qemu-system-x86_64 $KVM_ARG -machine q35,accel=kvm:tcg -cpu $CPU_ARG,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time -m $MEMORY -smp $SMP_CORES -vga std -usb -device usb-tablet $BOOT_ORDER -drive file=/data/disk.qcow2,format=qcow2,cache=writeback,aio=threads -drive file=/iso/os.iso,media=cdrom -netdev user,id=net0,hostfwd=tcp::3389-:3389 -device e1000,netdev=net0 -display vnc=:0 -name "Windows10_VM" &\n\
+\n\
 sleep 5\n\
 websockify --web /novnc 6080 localhost:5900 &\n\
 echo "===================================================="\n\
