@@ -2,15 +2,7 @@ import os
 import subprocess
 import time
 import sys
-
-def run_command(command, description):
-    print(f"🔄 {description}...")
-    try:
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        return process
-    except Exception as e:
-        print(f"❌ ভুল হয়েছে: {e}")
-        sys.exit(1)
+import re
 
 def main():
     # ১. ডকার ইমেজ বিল্ড করা
@@ -24,28 +16,29 @@ def main():
 
     # ২. ডকার কন্টেইনার রান করা
     print("🚀 কন্টেইনার চালু করা হচ্ছে...")
-    run_cmd = "docker run -d -p 6080:6080 --name my-gui-container ubuntu-gui"
     # আগের কন্টেইনার থাকলে রিমুভ করে নেওয়া
     subprocess.run("docker rm -f my-gui-container", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    run_cmd = "docker run -d -p 6080:6080 --name my-gui-container ubuntu-gui"
     subprocess.run(run_cmd, shell=True)
     
-    # কন্টেইনার বুট হওয়ার জন্য ২ সেকেন্ড সময় দেওয়া
     time.sleep(2)
 
-    # ৩. Cloudflared ডাউনলোড করা (যদি আগে থেকে না থাকে)
+    # ৩. Cloudflared ডাউনলোড করা
     if not os.path.exists("./cloudflared"):
+        print("🔄 Cloudflared ডাউনলোড করা হচ্ছে...")
         download_cmd = "curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared && chmod +x cloudflared"
-        run_command(download_cmd, "Cloudflared ডাউনলোড করা হচ্ছে")
-        time.sleep(5)
+        subprocess.run(download_cmd, shell=True)
+        time.sleep(2)
 
-    # ৪. Trycloudflare টানেল চালু করা এবং লিংক খোঁজা
+    # ৪. Trycloudflare টানেল चालू করা
     print("🌐 Cloudflare Tunnel তৈরি করা হচ্ছে...")
     tunnel_cmd = "./cloudflared tunnel --url http://localhost:6080"
+    
+    # stderr এবং stdout দুটোই রিড করার জন্য প্রসেস ওপেন করা
     tunnel_proc = subprocess.Popen(tunnel_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
-    print("\n⌛ আপনার লিংকের জন্য অপেক্ষা করুন (কয়েক সেকেন্ড সময় লাগতে পারে)...")
+    print("\n⌛ আপনার অরিজিনাল লিংকের জন্য অপেক্ষা করুন (কয়েক সেকেন্ড সময় লাগবে)...")
     
-    # Cloudflare-এর আউটপুট থেকে trycloudflare.com লিংকটি খুঁজে বের করা
     link_found = False
     start_time = time.time()
     
@@ -53,29 +46,25 @@ def main():
         output = tunnel_proc.stdout.readline()
         if output == '' and tunnel_proc.poll() is not None:
             break
-        if "trycloudflare.com" in output:
-            for word in output.split():
-                if "trycloudflare.com" in word:
-                    # পরিষ্কার লিংক বের করা
-                    clean_url = word.strip().replace("https://", "").replace("http://", "")
-                    clean_url = f"https://{clean_url}"
-                    
-                    print("\n" + "="*50)
-                    print("🟢 আপনার লিনাক্স ডেস্কটপ রেডি!")
-                    print(f"🔗 URL: {clean_url}")
-                    print("🔑 VNC Password: bullet123")
-                    print("="*50 + "\n")
-                    link_found = True
-                    break
-        if link_found:
+        
+        # Regex ব্যবহার করে সম্পূর্ণ trycloudflare.com লিংকটি খুঁজে বের করা
+        match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', output)
+        if match:
+            clean_url = match.group(0)
+            print("\n" + "="*60)
+            print("🟢 আপনার লিনাক্স ডেস্কটপ একদম রেডি!")
+            print(f"🔗 ORIGINAL URL: {clean_url}")
+            print("🔑 VNC Password: bullet123")
+            print("="*60 + "\n")
+            link_found = True
             break
             
-        # ৩০ সেকেন্ড পার হয়ে গেলে লুপ বন্ধ করা (সেফটি চেক)
+        # ৩০ সেকেন্ড সেফটি টাইমআউট
         if time.time() - start_time > 30:
-            print("⚠️ লিংক পেতে একটু সময় লাগছে, অনুগ্রহ করে Codespaces-এর 'Ports' ট্যাব চেক করুন।")
+            print("\n⚠️ স্ক্রিপ্ট থেকে লিংকটি ফিল্টার করা যায়নি।")
+            print("💡 বিকল্প বুদ্ধি: Codespaces-এর নিচে 'Ports' ট্যাবে যান এবং 6080 পোর্টের পাশে থাকা লিংকে ক্লিক করুন।")
             break
 
-    # টানেল চালু রাখার জন্য স্ক্রিপ্টটিকে ধরে রাখা
     try:
         tunnel_proc.wait()
     except KeyboardInterrupt:
