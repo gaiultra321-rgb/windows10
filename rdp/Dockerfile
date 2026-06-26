@@ -1,71 +1,32 @@
 FROM ubuntu:22.04
 
+# এনভায়রনমেন্ট ভ্যারিয়েবল সেট করা (ইউজার ইন্টারঅ্যাকশন এড়ানোর জন্য)
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    qemu-system-x86 \
-    qemu-utils \
-    novnc \
-    websockify \
-    wget \
+# প্রয়োজনীয় প্যাকেজ, LXDE ডেস্কটপ এবং VNC ইনস্টল করা
+RUN apt-get update && apt-get install -y \
+    lxde \
+    tightvncserver \
+    autocutsel \
     curl \
-    net-tools \
-    unzip \
+    git \
     python3 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean
 
-RUN mkdir -p /data /iso /novnc
+# noVNC ডাউনলোড করা (ব্রাউজারে দেখার জন্য)
+RUN git clone https://github.com/novnc/noVNC.git /root/novnc
 
-# noVNC 404 ফিক্স
-RUN wget https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.zip -O /tmp/novnc.zip && \
-    unzip /tmp/novnc.zip -d /tmp && \
-    mv /tmp/noVNC-1.5.0/* /novnc && \
-    ln -s /novnc/vnc.html /novnc/index.html && \
-    rm -rf /tmp/novnc.zip /tmp/noVNC-1.5.0
+# VNC পাসওয়ার্ড সেট করা (ডিফল্ট পাসওয়ার্ড: 'bullet123')
+RUN mkdir /root/.vnc && \
+    echo "bullet123" | vncpasswd -f > /root/.vnc/passwd && \
+    chmod 600 /root/.vnc/passwd
 
-ENV ISO_URL="https://archive.org/download/windows-10-lite-edition-19h2-x64/Windows%2010%20Lite%20Edition%2019H2%20x64.iso"
-
+# VNC ও noVNC স্টার্ট করার স্ক্রিপ্ট তৈরি
 RUN echo '#!/bin/bash\n\
-set -e\n\
-if [ -e /dev/kvm ]; then\n\
-  echo "✅ KVM acceleration available"\n\
-  KVM_ARG="-enable-kvm"\n\
-  CPU_ARG="host"\n\
-  MEMORY="10G"\n\
-  SMP_CORES=3\n\
-else\n\
-  echo "⚠️  KVM not available"\n\
-  KVM_ARG=""\n\
-  CPU_ARG="max"\n\
-  MEMORY="4G"\n\
-  SMP_CORES=2\n\
-fi\n\
-if [ ! -f "/iso/os.iso" ]; then\n\
-  echo "📥 Downloading Windows 10 ISO..."\n\
-  wget -q --show-progress "$ISO_URL" -O "/iso/os.iso"\n\
-fi\n\
-if [ ! -f "/data/disk.qcow2" ]; then\n\
-  echo "💽 Creating 100GB virtual disk..."\n\
-  qemu-img create -f qcow2 "/data/disk.qcow2" 100G\n\
-fi\n\
-BOOT_ORDER="-boot order=c,menu=on"\n\
-if [ ! -s "/data/disk.qcow2" ] || [ $(stat -c%s "/data/disk.qcow2") -lt 1048576 ]; then\n\
-  echo "🚀 First boot - installing Windows from ISO"\n\
-  BOOT_ORDER="-boot order=d,menu=on"\n\
-fi\n\
-echo "⚙️ Starting Windows 10 VM with ${SMP_CORES} CPU cores and ${MEMORY} RAM"\n\
-\n\
-# এক লাইনে ক্লিন QEMU কমান্ড (কোনো ব্যাকস্ল্যাশ এরর হবে না)\n\
-qemu-system-x86_64 $KVM_ARG -machine q35,accel=kvm:tcg -cpu $CPU_ARG,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time -m $MEMORY -smp $SMP_CORES -vga std -usb -device usb-tablet $BOOT_ORDER -drive file=/data/disk.qcow2,format=qcow2,cache=writeback,aio=threads -drive file=/iso/os.iso,media=cdrom -netdev user,id=net0,hostfwd=tcp::3389-:3389 -device e1000,netdev=net0 -display vnc=:0 -name "Windows10_VM" &\n\
-\n\
-sleep 5\n\
-websockify --web /novnc 6080 localhost:5900 &\n\
-echo "===================================================="\n\
-echo "🌐 Connect via VNC: http://localhost:6080"\n\
-echo "🔌 After install, use RDP: localhost:3389"\n\
-echo "===================================================="\n\
-tail -f /dev/null\n' > /start.sh && chmod +x /start.sh
+vncserver :1 -geometry 1280x720 -depth 24\n\
+/root/novnc/utils/novnc_proxy --vnc localhost:5901 --listen 6080\n\
+' > /root/start.sh && chmod +x /root/start.sh
 
-VOLUME ["/data", "/iso"]
-EXPOSE 6080 3389
-CMD ["/start.sh"]
+EXPOSE 6080
+
+CMD ["/root/start.sh"]
