@@ -22,15 +22,15 @@ jobs:
           --link redroid-phone:phone \
           dorowu/ubuntu-desktop-lxde-vnc:latest
 
-    - name: Connect Android to Web VNC Desktop
+    - name: Configure Tools inside VNC Desktop
       run: |
-        sleep 5
-        # VNC ডেস্কটপের ভেতরে adb এবং scrcpy দিয়ে অ্যান্ড্রয়েড স্ক্রিনটি ওপেন করে দিচ্ছি
-        sudo docker exec -d vnc-desktop apt-get update
-        sudo docker exec -d vnc-desktop apt-get install -y adb scrcpy
+        sleep 10
+        # প্রথমে ডেস্কটপের ভেতরে adb ও scrcpy পুরোপুরি ইনস্টল হওয়া পর্যন্ত অপেক্ষা করবে
+        sudo docker exec vnc-desktop apt-get update
+        sudo docker exec vnc-desktop apt-get install -y adb scrcpy
         
-        # ব্যাকগ্রাউন্ডে অ্যান্ড্রয়েডের সাথে কানেক্ট করে scrcpy স্ক্রিন অন করে দেওয়া
-        sudo docker exec -d vnc-desktop adb connect phone:5555
+        # ইনস্টলেশন শেষ হলে এবার ব্যাকগ্রাউন্ডে অ্যান্ড্রয়েডের সাথে কানেক্ট করে স্ক্রিন অন করবে
+        sudo docker exec vnc-desktop adb connect phone:5555
         sudo docker exec -d vnc-desktop scrcpy --max-fps 30 --bit-rate 2M
 
     - name: Install & Run Cloudflare Tunnel
@@ -38,7 +38,7 @@ jobs:
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
         
-        # পোর্ট ৮০ (যেখানে ওয়েব ইন্টারফেস আছে) সেটিকে ক্লাউডফ্লেয়ার টানেলে দেওয়া হলো
+        # পোর্ট ৮০ ক্লাউডফ্লেয়ার টানেলে দেওয়া হলো
         cloudflared tunnel --url http://localhost:80 > cf.log 2>&1 &
         
     - name: Get Cloudflare Link and Keep Alive
