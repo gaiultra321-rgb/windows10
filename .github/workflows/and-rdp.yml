@@ -6,13 +6,7 @@ jobs:
   run-android:
     runs-on: ubuntu-latest
     steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-size: 20
-        node-version: 18
-
-    - name: Start ReDroid (No GPU Mode)
+    - name: Start ReDroid (Android 11)
       run: |
         sudo docker run -d -p 5555:5555 \
           --privileged \
@@ -20,19 +14,32 @@ jobs:
           redroid/redroid:11.0.0-latest \
           androidboot.redroid_gpu_mode=guest
 
-    - name: Install & Start Web-Scrcpy via Node
+    - name: Start Ubuntu Web VNC Desktop
       run: |
-        # বিশ্বস্ত অফিসিয়াল সোর্স থেকে সরাসরি npm দিয়ে ইন্সটল করা হচ্ছে
-        sudo npm install -g ws-scrcpy
+        # এটি ব্রাউজারে একটি সম্পূর্ণ লাইটওয়েট লিনাক্স ডেস্কটপ ওপেন করবে পোর্ট ৮০ তে
+        sudo docker run -d -p 80:80 \
+          --name vnc-desktop \
+          --link redroid-phone:phone \
+          dorowu/ubuntu-desktop-lxde-vnc:latest
+
+    - name: Connect Android to Web VNC Desktop
+      run: |
+        sleep 5
+        # VNC ডেস্কটপের ভেতরে adb এবং scrcpy দিয়ে অ্যান্ড্রয়েড স্ক্রিনটি ওপেন করে দিচ্ছি
+        sudo docker exec -d vnc-desktop apt-get update
+        sudo docker exec -d vnc-desktop apt-get install -y adb scrcpy
         
-        # ব্যাকগ্রাউন্ডে এটি রান করে দিচ্ছি যেন ৮০০০ পোর্টে ওয়েব ইন্টারফেস পাওয়া যায়
-        ws-scrcpy > scrcpy.log 2>&1 &
+        # ব্যাকগ্রাউন্ডে অ্যান্ড্রয়েডের সাথে কানেক্ট করে scrcpy স্ক্রিন অন করে দেওয়া
+        sudo docker exec -d vnc-desktop adb connect phone:5555
+        sudo docker exec -d vnc-desktop scrcpy --max-fps 30 --bit-rate 2M
 
     - name: Install & Run Cloudflare Tunnel
       run: |
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
-        cloudflared tunnel --url http://localhost:8000 > cf.log 2>&1 &
+        
+        # পোর্ট ৮০ (যেখানে ওয়েব ইন্টারফেস আছে) সেটিকে ক্লাউডফ্লেয়ার টানেলে দেওয়া হলো
+        cloudflared tunnel --url http://localhost:80 > cf.log 2>&1 &
         
     - name: Get Cloudflare Link and Keep Alive
       run: |
