@@ -1,0 +1,42 @@
+name: Run Cloud Phone with Cloudflare
+on: 
+  workflow_dispatch:
+
+jobs:
+  run-android:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Start ReDroid (No GPU Mode)
+      run: |
+        sudo docker run -d -p 5555:5555 \
+          --privileged \
+          --name redroid-phone \
+          redroid/redroid:11.0.0-latest \
+          androidboot.redroid_gpu_mode=guest
+
+    - name: Install Web-Scrcpy
+      run: |
+        sudo docker run -d -p 8000:8000 --link redroid-phone:phone srsalmeida/ws-scrcpy:latest
+
+    - name: Install & Run Cloudflare Tunnel
+      run: |
+        # Cloudflared (Cloudflare Tunnel CLI) ডাউনলোড ও ইনস্টল করা
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        
+        # কোনো কনফিগারেশন ছাড়াই একটি কুইক ফ্রি টানেল তৈরি করা (পোর্ট ৮০০০ এর জন্য)
+        # এটার আউটপুট একটি ফাইলে সেভ করছি যেন আমরা লিঙ্কটা দেখতে পারি
+        cloudflared tunnel --url http://localhost:8000 > cf.log 2>&1 &
+        
+    - name: Get Cloudflare Link and Keep Alive
+      run: |
+        sleep 8
+        echo "=================================================="
+        echo "আপনার ভার্চুয়াল ফোনের ক্লাউডফ্লেয়ার লিঙ্কটি নিচে দেখুন:"
+        # লগ ফাইল থেকে কাস্টম .trycloudflare.com লিঙ্কটি খুঁজে বের করা
+        grep -o 'https://[^ ]*\.trycloudflare\.com' cf.log | head -n 1
+        echo "=================================================="
+        
+        # ৩ ঘণ্টার জন্য সেশন চালু রাখতে (10800 সেকেন্ড)
+        echo "ভার্চুয়াল ফোনটি সচল আছে..."
+        sleep 10800
