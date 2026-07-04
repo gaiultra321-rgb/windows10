@@ -25,7 +25,10 @@ jobs:
     - name: Configure Tools inside VNC Desktop
       run: |
         sleep 10
-        # প্রথমে ডেস্কটপের ভেতরে adb ও scrcpy পুরোপুরি ইনস্টল হওয়া পর্যন্ত অপেক্ষা করবে
+        # গুগল ক্রোমের সমস্যা করা পুরনো রিপোজিটরি ফাইলটি রিমুভ করে দেওয়া হচ্ছে যেন এরর না আসে
+        sudo docker exec vnc-desktop rm -f /etc/apt/sources.list.d/google-chrome.list
+        
+        # এবার আপডেট এবং ইনস্টল করা হচ্ছে
         sudo docker exec vnc-desktop apt-get update
         sudo docker exec vnc-desktop apt-get install -y adb scrcpy
         
