@@ -24,7 +24,7 @@ jobs:
 
     - name: Configure Tools inside VNC Desktop
       run: |
-        sleep 10
+        sleep 15
         # গুগল ক্রোমের সমস্যা করা পুরনো রিপোজিটরি ফাইলটি রিমুভ করে দেওয়া হচ্ছে
         sudo docker exec vnc-desktop rm -f /etc/apt/sources.list.d/google-chrome.list
         
@@ -32,11 +32,14 @@ jobs:
         sudo docker exec vnc-desktop apt-get update
         sudo docker exec vnc-desktop apt-get install -y adb scrcpy
         
-        # HOME পরিবেশক ভেরিয়েবল সেট করে adb কানেক্ট করা হচ্ছে যেন পারমিশন এরর না আসে
+        # অ্যান্ড্রয়েড কন্টেইনারটি বুট হওয়া শেষ করার জন্য আরও ৫ সেকেন্ড অপেক্ষা
+        sleep 5
+        
+        # HOME এনভায়রনমেন্ট ভ্যারিয়েবল সহ adb কানেক্ট করা হচ্ছে
         sudo docker exec -e HOME=/root vnc-desktop adb connect phone:5555
         
-        # ব্যাকগ্রাউন্ডে scrcpy স্ক্রিন অন করে দেওয়া
-        sudo docker exec -d -e HOME=/root DISPLAY=:1 vnc-desktop scrcpy --max-fps 30 --bit-rate 2M
+        # ডকার সিনট্যাক্স ঠিক করে ব্যাকগ্রাউন্ডে scrcpy স্ক্রিন অন করা হচ্ছে
+        sudo docker exec -d -e HOME=/root -e DISPLAY=:1 vnc-desktop scrcpy --max-fps 30 --bit-rate 2M
 
     - name: Install & Run Cloudflare Tunnel
       run: |
@@ -50,7 +53,7 @@ jobs:
       run: |
         sleep 12
         echo "=================================================="
-        echo "আপনার ভার্চুয়াল ফোনের ক্লাউডফ্লেয়ার লিঙ্কটি নিচে দেখুন:"
+        echo "আপনার ভার্চুয়াল জনের ক্লাউডফ্লেয়ার লিঙ্কটি নিচে দেখুন:"
         grep -o 'https://[^ ]*\.trycloudflare\.com' cf.log | head -n 1
         echo "=================================================="
         
