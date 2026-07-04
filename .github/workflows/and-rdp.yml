@@ -6,6 +6,12 @@ jobs:
   run-android:
     runs-on: ubuntu-latest
     steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-size: 20
+        node-version: 18
+
     - name: Start ReDroid (No GPU Mode)
       run: |
         sudo docker run -d -p 5555:5555 \
@@ -14,14 +20,13 @@ jobs:
           redroid/redroid:11.0.0-latest \
           androidboot.redroid_gpu_mode=guest
 
-    - name: Install Web-Scrcpy (Updated Image)
+    - name: Install & Start Web-Scrcpy via Node
       run: |
-        # আগেরটি কাজ না করায় এখানে নতুন ও আপডেটেড ওয়েব ইন্টারফেস ইমেজ ব্যবহার করা হয়েছে
-        sudo docker run -d -p 8000:8000 \
-          --name web-scrcpy \
-          --link redroid-phone:phone \
-          -e ADB_SERVER_SOCKET=tcp:phone:5555 \
-          emptysuns/scrcpy-web:latest
+        # বিশ্বস্ত অফিসিয়াল সোর্স থেকে সরাসরি npm দিয়ে ইন্সটল করা হচ্ছে
+        sudo npm install -g ws-scrcpy
+        
+        # ব্যাকগ্রাউন্ডে এটি রান করে দিচ্ছি যেন ৮০০০ পোর্টে ওয়েব ইন্টারফেস পাওয়া যায়
+        ws-scrcpy > scrcpy.log 2>&1 &
 
     - name: Install & Run Cloudflare Tunnel
       run: |
@@ -31,7 +36,7 @@ jobs:
         
     - name: Get Cloudflare Link and Keep Alive
       run: |
-        sleep 10
+        sleep 12
         echo "=================================================="
         echo "আপনার ভার্চুয়াল ফোনের ক্লাউডফ্লেয়ার লিঙ্কটি নিচে দেখুন:"
         grep -o 'https://[^ ]*\.trycloudflare\.com' cf.log | head -n 1
